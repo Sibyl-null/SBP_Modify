@@ -1,4 +1,3 @@
-#if UNITY_2019_3_OR_NEWER
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,21 +10,20 @@ namespace UnityEditor.Build.Pipeline.Tasks
 {
     /// <summary>
     /// Build Task that calculates teh included objects and references objects for custom assets not tracked by the AssetDatabase.
+    /// 计算未被 AssetDatabase 跟踪的自定义资产的包含对象和引用对象的构建任务。
     /// <seealso cref="IBuildTask"/>
     /// </summary>
     public class CalculateCustomDependencyData : IBuildTask
     {
-        /// <inheritdoc />
-        public int Version { get { return 2; } }
+        public int Version => 2;
 
-#pragma warning disable 649
         [InjectContext(ContextUsage.In)]
         IBuildParameters m_Parameters;
 
-        [InjectContext(ContextUsage.InOut)]
+        [InjectContext]
         IBundleBuildContent m_Content;
 
-        [InjectContext(ContextUsage.InOut)]
+        [InjectContext]
         IDependencyData m_DependencyData;
 
         [InjectContext(ContextUsage.Out, true)]
@@ -39,7 +37,6 @@ namespace UnityEditor.Build.Pipeline.Tasks
 
         [InjectContext(ContextUsage.In, true)]
         IBuildLogger m_Log;
-#pragma warning restore 649
 
         BuildUsageTagGlobal m_GlobalUsage;
         BuildUsageTagGlobal m_CustomUsage;
@@ -47,7 +44,6 @@ namespace UnityEditor.Build.Pipeline.Tasks
         Dictionary<string, AssetLoadInfo> m_AssetInfo = new Dictionary<string, AssetLoadInfo>();
         Dictionary<string, BuildUsageTagSet> m_BuildUsage = new Dictionary<string, BuildUsageTagSet>();
 
-        /// <inheritdoc />
         public ReturnCode Run()
         {
             m_CustomAssets = new CustomAssets();
@@ -187,7 +183,8 @@ namespace UnityEditor.Build.Pipeline.Tasks
             assetInfo.asset = HashingMethods.Calculate(address).ToGUID();
             assetInfo.address = address;
             if (m_DependencyData.AssetInfo.ContainsKey(assetInfo.asset))
-                throw new ArgumentException(string.Format("Custom Asset '{0}' already exists. Building duplicate asset entries is not supported.", address));
+                throw new ArgumentException(
+                    $"Custom Asset '{address}' already exists. Building duplicate asset entries is not supported.");
             SetOutputInformation(bundleName, assetInfo, buildUsage);
         }
 
@@ -204,4 +201,3 @@ namespace UnityEditor.Build.Pipeline.Tasks
         }
     }
 }
-#endif
