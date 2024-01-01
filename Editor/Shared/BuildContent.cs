@@ -15,16 +15,7 @@ namespace UnityEditor.Build.Pipeline
     [Serializable]
     public class CustomAssets : ICustomAssets
     {
-        /// <inheritdoc />
-        public List<GUID> Assets { get; private set; }
-
-        /// <summary>
-        /// Default constructor, creates an empty CustomAssets.
-        /// </summary>
-        public CustomAssets()
-        {
-            Assets = new List<GUID>();
-        }
+        public List<GUID> Assets { get; private set; } = new();
     }
 
     /// <summary>
@@ -39,11 +30,6 @@ namespace UnityEditor.Build.Pipeline
         public List<CustomContent> CustomAssets { get; private set; }
         
         public BuildContent() {}
-
-        /// <summary>
-        /// Default constructor, takes a set of Assets and converts them to the appropriate properties.
-        /// </summary>
-        /// <param name="assets">The set of Assets identified by GUID to ensure are packaged with the build</param>
         public BuildContent(IEnumerable<GUID> assets)
         {
             if (assets == null)
@@ -81,11 +67,6 @@ namespace UnityEditor.Build.Pipeline
         public Dictionary<string, List<GUID>> BundleLayout { get; private set; }
         
         public BundleBuildContent() {}
-
-        /// <summary>
-        /// Default constructor, takes a set of AssetBundleBuild and converts them to the appropriate properties.
-        /// </summary>
-        /// <param name="bundleBuilds">The set of AssetBundleBuild to be built.</param>
         public BundleBuildContent(IEnumerable<AssetBundleBuild> bundleBuilds)
         {
             if (bundleBuilds == null)
@@ -122,12 +103,9 @@ namespace UnityEditor.Build.Pipeline
                 
                 string address = GetAddress(bundleBuild, i, assetPath);
 
-                // Add the guid to the bundle map
                 guids.Add(asset);
-                // Add the guid & address
                 Addresses.Add(asset, address);
 
-                // Add the asset to the correct collection
                 if (status == ValidationMethods.Status.Asset)
                     Assets.Add(asset);
                 else if (status == ValidationMethods.Status.Scene)
