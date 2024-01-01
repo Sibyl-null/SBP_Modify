@@ -1,0 +1,18 @@
+﻿@startuml
+
+interface IContextObject
+
+interface IDependencyData{
+    + Dic<GUID, AssetLoadInfo> AssetInfo { get; }
+    + Dic<GUID, BuildUsageTagSet> AssetUsage { get; }
+    + Dic<GUID, SceneDependencyInfo> SceneInfo { get; }
+    + Dic<GUID, BuildUsageTagSet> SceneUsage { get; }
+    + Dic<GUID, Hash128> DependencyHash { get; }
+    + BuildUsageCache DependencyUsageCache { get; }
+    + BuildUsageTagGlobal GlobalUsage { get; set; }
+}
+
+IContextObject <|-- IDependencyData
+IDependencyData <|-- BuildDependencyData
+
+@enduml

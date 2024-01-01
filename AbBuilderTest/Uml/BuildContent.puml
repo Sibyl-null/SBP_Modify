@@ -1,0 +1,25 @@
+﻿@startuml
+
+interface IContextObject
+
+interface IBuildContent{
+    + List<GUID> Assets { get; }
+    + List<GUID> Scenes { get; }
+    + List<CustomContent> CustomAssets { get; }
+}
+
+interface IBundleBuildContent{
+    + Dic<string, List<GUID>> BundleLayout { get; }
+    + Dic<string, List<ResourceFile>> AdditionalFiles { get; }
+    + Dic<GUID, string> Addresses { get; }
+}
+
+class BuildContent
+class BundleBuildContent
+
+IContextObject <|-- IBuildContent
+IBuildContent <|-- IBundleBuildContent
+IBundleBuildContent <|-- BundleBuildContent
+IBuildContent <|-- BuildContent
+
+@enduml
