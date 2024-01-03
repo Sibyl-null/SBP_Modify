@@ -13,20 +13,6 @@ namespace UnityEditor.Build.Pipeline.Tasks
     /// </summary>
     public class CalculateAssetDependencyData : IBuildTask
     {
-        internal const int kVersion = 5;
-
-        public int Version => kVersion;
-
-        [InjectContext(ContextUsage.InOut, true)] private IBuildSpriteData m_SpriteData;
-        [InjectContext(ContextUsage.InOut, true)] private IBuildExtendedAssetData m_ExtendedAssetData;
-        [InjectContext(ContextUsage.In, true)] private IProgressTracker m_Tracker;
-        [InjectContext(ContextUsage.In, true)] private IBuildCache m_Cache;
-        [InjectContext(ContextUsage.In, true)] private IBuildLogger m_Log;
-        
-        [InjectContext(ContextUsage.In)] private IBundleBuildParameters m_Parameters;
-        [InjectContext(ContextUsage.In)] private IBuildContent m_Content;
-        [InjectContext] private IDependencyData m_DependencyData;
-
         internal struct TaskInput
         {
             public IBuildCache BuildCache;
@@ -55,6 +41,20 @@ namespace UnityEditor.Build.Pipeline.Tasks
             public AssetOutput[] AssetResults;
             public int CachedAssetCount;
         }
+        
+        internal const int kVersion = 5;
+
+        public int Version => kVersion;
+
+        [InjectContext(ContextUsage.InOut, true)] private IBuildSpriteData m_SpriteData;
+        [InjectContext(ContextUsage.InOut, true)] private IBuildExtendedAssetData m_ExtendedAssetData;
+        [InjectContext(ContextUsage.In, true)] private IProgressTracker m_Tracker;
+        [InjectContext(ContextUsage.In, true)] private IBuildCache m_Cache;
+        [InjectContext(ContextUsage.In, true)] private IBuildLogger m_Log;
+        
+        [InjectContext(ContextUsage.In)] private IBundleBuildParameters m_Parameters;
+        [InjectContext(ContextUsage.In)] private IBuildContent m_Content;
+        [InjectContext] private IDependencyData m_DependencyData;
 
         public ReturnCode Run()
         {
@@ -98,16 +98,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             output = new TaskOutput();
             output.AssetResults = new AssetOutput[input.Assets.Count];
 
-            IList<CachedInfo> cachedInfo = null;
-            using (input.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
-            {
-                if (input.BuildCache != null)
-                {
-                    IList<CacheEntry> entries = input.Assets.Select(x =>
-                        GetAssetCacheEntry(input.BuildCache, x, input.NonRecursiveDependencies)).ToList();
-                    input.BuildCache.LoadCachedData(entries, out cachedInfo);
-                }
-            }
+            IList<CachedInfo> cachedInfo = GatheringCacheEntriesToLoad(input);
 
             for (int i = 0; i < input.Assets.Count; i++)
             {
@@ -115,21 +106,20 @@ namespace UnityEditor.Build.Pipeline.Tasks
                 {
                     AssetOutput assetResult = new AssetOutput();
                     assetResult.Asset = input.Assets[i];
-
-                   
+                    
                     if (cachedInfo != null && cachedInfo[i] != null)
                     {
-                        var objectTypes = cachedInfo[i].Data[4] as List<ObjectTypes>;
-                        var assetInfos = cachedInfo[i].Data[0] as AssetLoadInfo;
+                        List<ObjectTypes> objectTypes = (List<ObjectTypes>)cachedInfo[i].Data[4];
+                        AssetLoadInfo assetInfos = (AssetLoadInfo)cachedInfo[i].Data[0];
 
                         bool useCachedData = true;
-                        foreach (var objectType in objectTypes)
+                        foreach (ObjectTypes objectType in objectTypes)
                         {
-                            //Sprite association to SpriteAtlas might have changed since last time data was cached, this might 
-                            //imply that we have stale data in our cache, if so ensure we regenerate the data.
+                            // 自上次缓存数据以来，SpriteAtlas 和 Sprite 的关联可能发生了变化
+                            // 这可能意味着我们的缓存中有过时的数据，如果是这样，请确保我们生成数据
                             if (objectType.Types[0] == typeof(UnityEngine.Sprite))
                             {
-                                var referencedObjectOld = assetInfos.referencedObjects.ToArray();
+                                ObjectIdentifier[] referencedObjectOld = assetInfos.referencedObjects.ToArray();
                                 ObjectIdentifier[] referencedObjectsNew = null;
 #if NONRECURSIVE_DEPENDENCY_DATA
                                 if (input.NonRecursiveDependencies)
@@ -143,13 +133,14 @@ namespace UnityEditor.Build.Pipeline.Tasks
                                     referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), input.Target, input.TypeDB);
                                 }
 
-                                if (Enumerable.SequenceEqual(referencedObjectOld, referencedObjectsNew) == false)
+                                if (referencedObjectOld.SequenceEqual(referencedObjectsNew) == false)
                                 {
                                     useCachedData = false;
                                 }
                                 break;
                             }
                         }
+                        
                         if (useCachedData)
                         { 
                             assetResult.AssetInfo = assetInfos;
@@ -213,6 +204,29 @@ namespace UnityEditor.Build.Pipeline.Tasks
                 }
             }
 
+            GatheringCacheEntriesToSave(input, output, cachedInfo);
+
+            return ReturnCode.Success;
+        }
+
+        private static IList<CachedInfo> GatheringCacheEntriesToLoad(TaskInput input)
+        {
+            IList<CachedInfo> cachedInfo = null;
+            using (input.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
+            {
+                if (input.BuildCache != null)
+                {
+                    IList<CacheEntry> entries = input.Assets.Select(x =>
+                        GetAssetCacheEntry(input.BuildCache, x, input.NonRecursiveDependencies)).ToList();
+                    input.BuildCache.LoadCachedData(entries, out cachedInfo);
+                }
+            }
+
+            return cachedInfo;
+        }
+
+        private static void GatheringCacheEntriesToSave(TaskInput input, TaskOutput output, IList<CachedInfo> cachedInfo)
+        {
             using (input.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Save"))
             {
                 if (input.BuildCache != null)
@@ -227,11 +241,10 @@ namespace UnityEditor.Build.Pipeline.Tasks
                                 r.SpriteData, r.ExtendedData, input.NonRecursiveDependencies));
                         }
                     }
+
                     input.BuildCache.SaveCachedData(toCache);
                 }
             }
-
-            return ReturnCode.Success;
         }
 
         private void PostSuccessRun(TaskOutput output)
