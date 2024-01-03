@@ -28,7 +28,7 @@ namespace UnityEditor.Build.Pipeline.Utilities
     }
 
     /// <summary>
-    /// Creates a container to store data in build cache.
+    /// 创建容器以在生成缓存中存储数据
     /// </summary>
     [Serializable]
     public struct CacheEntry : IEquatable<CacheEntry>
@@ -85,49 +85,34 @@ namespace UnityEditor.Build.Pipeline.Utilities
         /// Stores the entry scripting type.
         /// </summary>
         public string ScriptType { get; internal set; }
-
-        /// <summary>
-        /// Determines if the entry is valid.
-        /// </summary>
-        /// <returns>Returns true if the entry is valid. Returns false otherwise.</returns>
+        
         public bool IsValid()
         {
             return Hash.isValid && !Guid.Empty();
         }
-
-        /// <summary>
-        /// Determines if the current entry instance is equal to the specified entry.
-        /// </summary>
-        /// <param name="obj">The entry to compare.</param>
-        /// <returns>Returns true if the entries are equivalent. Returns false otherwise.</returns>
+        
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj))
                 return false;
-            return obj is CacheEntry && Equals((CacheEntry)obj);
+            return obj is CacheEntry entry && Equals(entry);
         }
 
-        /// <inheritdoc/>
         public static bool operator==(CacheEntry x, CacheEntry y)
         {
             return x.Equals(y);
         }
 
-        /// <inheritdoc/>
         public static bool operator!=(CacheEntry x, CacheEntry y)
         {
             return !(x == y);
         }
-
-        /// <summary>
-        /// Creates the hash code for the cache entry.
-        /// </summary>
-        /// <returns>Returns the hash code for the cache entry.</returns>
+        
         public override int GetHashCode()
         {
             unchecked
             {
-                var hashCode = Hash.GetHashCode();
+                int hashCode = Hash.GetHashCode();
                 hashCode = (hashCode * 397) ^ Guid.GetHashCode();
                 hashCode = (hashCode * 397) ^ Version;
                 hashCode = (hashCode * 397) ^ (int)Type;
@@ -136,28 +121,22 @@ namespace UnityEditor.Build.Pipeline.Utilities
                 return hashCode;
             }
         }
-
-        /// <summary>
-        /// Converts the information about the cache entry to a formatted string.
-        /// </summary>
-        /// <returns>Returns information about the cache entry.</returns>
+        
         public override string ToString()
         {
             if (Type == EntryType.File)
-                return string.Format("({0}, {1})", File, Hash);
+                return $"({File}, {Hash})";
+            
             if (Type == EntryType.ScriptType)
-                return string.Format("({0}, {1})", ScriptType, Hash);
-            return string.Format("({0}, {1})", Guid, Hash);
+                return $"({ScriptType}, {Hash})";
+            
+            return $"({Guid}, {Hash})";
         }
-
-        /// <summary>
-        /// Determines if the current entry instance is equal to the specified entry.
-        /// </summary>
-        /// <param name="other">The entry to compare.</param>
-        /// <returns>Returns true if the entries are equivalent. Returns false otherwise.</returns>
+        
         public bool Equals(CacheEntry other)
         {
-            return Hash.Equals(other.Hash) && Guid.Equals(other.Guid) && Version == other.Version && Type == other.Type && string.Equals(File, other.File) && string.Equals(ScriptType, other.ScriptType);
+            return Hash.Equals(other.Hash) && Guid.Equals(other.Guid) && Version == other.Version &&
+                   Type == other.Type && string.Equals(File, other.File) && string.Equals(ScriptType, other.ScriptType);
         }
     }
 }
