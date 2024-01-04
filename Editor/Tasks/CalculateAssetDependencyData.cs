@@ -108,15 +108,12 @@ namespace UnityEditor.Build.Pipeline.Tasks
             {
                 using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Calculate Asset Dependencies"))
                 {
-                    AssetOutput assetResult = new AssetOutput();
-                    assetResult.Asset = _taskInput.Assets[i];
-                    
                     // 尝试通过缓存，获取依赖项
-                    if (CalculateDependenciesByCache(i, cachedInfo, assetResult))
+                    if (CalculateDependenciesByCache(i, cachedInfo))
                         continue;
                     
                     // 如果没有缓存，或者缓存无效，则重新计算依赖项
-                    if (CalculateDependenciesNoCache(i, assetResult) == ReturnCode.Canceled) 
+                    if (CalculateDependenciesNoCache(i) == ReturnCode.Canceled) 
                         return ReturnCode.Canceled;
                 }
             }
@@ -143,7 +140,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return cachedInfo;
         }
 
-        private bool CalculateDependenciesByCache(int i, IList<CachedInfo> cachedInfo, AssetOutput assetResult)
+        private bool CalculateDependenciesByCache(int i, IList<CachedInfo> cachedInfo)
         {
             if (cachedInfo == null || cachedInfo[i] == null)
                 return false;
@@ -154,11 +151,16 @@ namespace UnityEditor.Build.Pipeline.Tasks
             bool useCachedData = JudgeSpriteAtlasRefChanged(i, objectTypes, assetInfos);
             if (useCachedData)
             { 
-                assetResult.AssetInfo = assetInfos;
-                assetResult.UsageTags = cachedInfo[i].Data[1] as BuildUsageTagSet;
-                assetResult.SpriteData = cachedInfo[i].Data[2] as SpriteImporterData;
-                assetResult.ExtendedData = cachedInfo[i].Data[3] as ExtendedAssetData;
-                assetResult.ObjectTypes = objectTypes;
+                AssetOutput assetResult = new AssetOutput
+                {
+                    Asset = _taskInput.Assets[i],
+                    AssetInfo = assetInfos,
+                    UsageTags = cachedInfo[i].Data[1] as BuildUsageTagSet,
+                    SpriteData = cachedInfo[i].Data[2] as SpriteImporterData,
+                    ExtendedData = cachedInfo[i].Data[3] as ExtendedAssetData,
+                    ObjectTypes = objectTypes
+                };
+
                 _taskOutput.AssetResults[i] = assetResult;
                 _taskOutput.CachedAssetCount++;
                 _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset} (cached)");
@@ -183,7 +185,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return true;
         }
 
-        private ReturnCode CalculateDependenciesNoCache(int i, AssetOutput assetResult)
+        private ReturnCode CalculateDependenciesNoCache(int i)
         {
             GUID asset = _taskInput.Assets[i];
             string assetPath = AssetDatabase.GUIDToAssetPath(asset.ToString());
@@ -193,12 +195,17 @@ namespace UnityEditor.Build.Pipeline.Tasks
                 return ReturnCode.Canceled;
             }
 
+            AssetOutput assetResult = new AssetOutput
+            {
+                Asset = _taskInput.Assets[i],
+                AssetInfo = new AssetLoadInfo(),
+                UsageTags = new BuildUsageTagSet()
+            };
+            
             _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
-
-            assetResult.AssetInfo = new AssetLoadInfo();
-            assetResult.UsageTags = new BuildUsageTagSet();
-
+            
             assetResult.AssetInfo.asset = asset;
+            
             ObjectIdentifier[] includedObjects =
                 ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
             assetResult.AssetInfo.includedObjects = new List<ObjectIdentifier>(includedObjects);
