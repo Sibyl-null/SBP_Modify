@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Sirenix.OdinInspector;
 using UnityEditor;
+using UnityEditor.Build.Content;
 using UnityEditor.Build.Pipeline;
 using UnityEditor.Build.Pipeline.Interfaces;
 using UnityEngine;
@@ -21,6 +22,7 @@ namespace AbBuilderTest.Editor
         public List<Material> materials = new List<Material>();
         public List<GameObject> prefabs = new List<GameObject>();
         public List<Object> anyThings = new List<Object>();
+        public Object asset;
         
         // --------------------------------------------
         
@@ -86,6 +88,31 @@ namespace AbBuilderTest.Editor
 
             AssetDatabase.Refresh();
             EditorUtility.RevealInFinder(path);
+        }
+
+        [Button]
+        private void LoadAssetRepresentations_AssetDatabase()
+        {
+            Object[] objects = AssetDatabase.LoadAllAssetRepresentationsAtPath(AssetDatabase.GetAssetPath(asset));
+            Debug.Log(objects.Length + " Sub Assets");
+            foreach (var obj in objects)
+                Debug.Log(obj);
+        }
+        
+        [Button]
+        private void LoadAssetRepresentations_ContentBuildInterface()
+        {
+            GUID guid = new GUID(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(asset)));
+            ObjectIdentifier[] identifiers =
+                ContentBuildInterface.GetPlayerAssetRepresentations(guid, BuildTarget.Android);
+
+            Debug.Log(identifiers.Length + " Sub Assets");
+            foreach (ObjectIdentifier identifier in identifiers)
+            {
+                Object obj = ObjectIdentifier.ToObject(identifier);
+                if (obj != null)
+                    Debug.Log(obj);
+            }
         }
 
         private ReturnCode OnPostScriptsCallback(IBuildParameters parameters, IBuildResults results)
