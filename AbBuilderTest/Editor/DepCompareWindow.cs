@@ -12,7 +12,7 @@ namespace AbBuilderTest.Editor
 {
     public class DepCompareWindow : OdinEditorWindow
     {
-        [MenuItem("Tools/Open DepCompareWindow")]
+        [MenuItem("Tools/Tests Window/Open DepCompareWindow")]
         private static void ShowWindow()
         {
             GetWindow<DepCompareWindow>();
