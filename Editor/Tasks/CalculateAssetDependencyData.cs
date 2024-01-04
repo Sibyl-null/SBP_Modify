@@ -191,9 +191,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             string assetPath = AssetDatabase.GUIDToAssetPath(asset.ToString());
 
             if (!_taskInput.ProgressTracker.UpdateInfoUnchecked(assetPath))
-            {
                 return ReturnCode.Canceled;
-            }
 
             AssetOutput assetResult = new AssetOutput
             {
@@ -201,24 +199,23 @@ namespace UnityEditor.Build.Pipeline.Tasks
                 AssetInfo = new AssetLoadInfo(),
                 UsageTags = new BuildUsageTagSet()
             };
-            
-            _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
-            
             assetResult.AssetInfo.asset = asset;
-            
+
+            _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
+
             ObjectIdentifier[] includedObjects =
                 ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
             assetResult.AssetInfo.includedObjects = new List<ObjectIdentifier>(includedObjects);
             
             ObjectIdentifier[] referencedObjects = GetReferencedObjects(includedObjects, asset);
-
             assetResult.AssetInfo.referencedObjects = new List<ObjectIdentifier>(referencedObjects);
-            var allObjects = new List<ObjectIdentifier>(includedObjects);
+            
+            List<ObjectIdentifier> allObjects = new List<ObjectIdentifier>(includedObjects);
             allObjects.AddRange(referencedObjects);
             ContentBuildInterface.CalculateBuildUsageTags(allObjects.ToArray(), includedObjects,
                 _taskInput.GlobalUsage, assetResult.UsageTags, _taskInput.DependencyUsageCache);
 
-            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
             if (importer != null && importer.textureType == TextureImporterType.Sprite)
             {
                 assetResult.SpriteData = new SpriteImporterData();
@@ -229,7 +226,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
                     assetResult.SpriteData.PackedSprite = referencedObjects.Length > 0;
             }
 
-            GatherAssetRepresentations(asset, _taskInput.Target, includedObjects, out assetResult.ExtendedData);
+            assetResult.ExtendedData = GatherAssetRepresentations(asset, _taskInput.Target, includedObjects);
             _taskOutput.AssetResults[i] = assetResult;
             
             return ReturnCode.Success;
@@ -303,19 +300,20 @@ namespace UnityEditor.Build.Pipeline.Tasks
             }
         }
 
-        private static void GatherAssetRepresentations(GUID asset, BuildTarget target, ObjectIdentifier[] includedObjects, out ExtendedAssetData extendedData)
+        private static ExtendedAssetData GatherAssetRepresentations(GUID asset, BuildTarget target, ObjectIdentifier[] includedObjects)
         {
-            extendedData = null;
-            var includeSet = new HashSet<ObjectIdentifier>(includedObjects);
-            // GetPlayerAssetRepresentations can return editor only objects, filter out those to only include what is in includedObjects
+            HashSet<ObjectIdentifier> includeSet = new HashSet<ObjectIdentifier>(includedObjects);
+            // GetPlayerAssetRepresentations 可以只返回编辑器对象，过滤掉那些只包含在includedObjects中的东西
             ObjectIdentifier[] representations = ContentBuildInterface.GetPlayerAssetRepresentations(asset, target);
-            var filteredRepresentations = representations.Where(includeSet.Contains);
+            
+            ObjectIdentifier[] filteredRepresentations = representations.Where(includeSet.Contains).ToArray();
             // Main Asset always returns at index 0, we only want representations, so check for greater than 1 length
-            if (representations.IsNullOrEmpty() || filteredRepresentations.Count() < 2)
-                return;
+            if (representations.IsNullOrEmpty() || filteredRepresentations.Length < 2)
+                return null;
 
-            extendedData = new ExtendedAssetData();
+            ExtendedAssetData extendedData = new ExtendedAssetData();
             extendedData.Representations.AddRange(filteredRepresentations.Skip(1));
+            return extendedData;
         }
         
         static CacheEntry GetAssetCacheEntry(IBuildCache cache, GUID asset, bool nonRecursiveDependencies)
