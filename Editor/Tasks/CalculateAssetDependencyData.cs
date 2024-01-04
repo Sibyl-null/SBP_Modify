@@ -101,6 +101,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             _taskOutput = new TaskOutput();
             _taskOutput.AssetResults = new AssetOutput[_taskInput.Assets.Count];
 
+            // 如果有缓存的话，加载所有缓存项
             IList<CachedInfo> cachedInfo = GatheringCacheEntriesToLoad();
 
             for (int i = 0; i < _taskInput.Assets.Count; i++)
@@ -110,20 +111,76 @@ namespace UnityEditor.Build.Pipeline.Tasks
                     AssetOutput assetResult = new AssetOutput();
                     assetResult.Asset = _taskInput.Assets[i];
                     
-                    if (cachedInfo != null && cachedInfo[i] != null)
-                    {
-                        if (CalculateDependenciesByCache(i, cachedInfo, assetResult))
-                            continue;
-                    }
-
+                    // 尝试通过缓存，获取依赖项
+                    if (CalculateDependenciesByCache(i, cachedInfo, assetResult))
+                        continue;
+                    
+                    // 如果没有缓存，或者缓存无效，则重新计算依赖项
                     if (CalculateDependenciesNoCache(i, assetResult) == ReturnCode.Canceled) 
                         return ReturnCode.Canceled;
                 }
             }
 
+            //  如果有缓存的话，保存所有缓存项
             GatheringCacheEntriesToSave(cachedInfo);
 
             return ReturnCode.Success;
+        }
+        
+        private IList<CachedInfo> GatheringCacheEntriesToLoad()
+        {
+            IList<CachedInfo> cachedInfo = null;
+            using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
+            {
+                if (_taskInput.BuildCache != null)
+                {
+                    IList<CacheEntry> entries = _taskInput.Assets.Select(x =>
+                        GetAssetCacheEntry(_taskInput.BuildCache, x, _taskInput.NonRecursiveDependencies)).ToList();
+                    _taskInput.BuildCache.LoadCachedData(entries, out cachedInfo);
+                }
+            }
+
+            return cachedInfo;
+        }
+
+        private bool CalculateDependenciesByCache(int i, IList<CachedInfo> cachedInfo, AssetOutput assetResult)
+        {
+            if (cachedInfo == null || cachedInfo[i] == null)
+                return false;
+            
+            List<ObjectTypes> objectTypes = (List<ObjectTypes>)cachedInfo[i].Data[4];
+            AssetLoadInfo assetInfos = (AssetLoadInfo)cachedInfo[i].Data[0];
+
+            bool useCachedData = JudgeSpriteAtlasRefChanged(i, objectTypes, assetInfos);
+            if (useCachedData)
+            { 
+                assetResult.AssetInfo = assetInfos;
+                assetResult.UsageTags = cachedInfo[i].Data[1] as BuildUsageTagSet;
+                assetResult.SpriteData = cachedInfo[i].Data[2] as SpriteImporterData;
+                assetResult.ExtendedData = cachedInfo[i].Data[3] as ExtendedAssetData;
+                assetResult.ObjectTypes = objectTypes;
+                _taskOutput.AssetResults[i] = assetResult;
+                _taskOutput.CachedAssetCount++;
+                _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset} (cached)");
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool JudgeSpriteAtlasRefChanged(int i, List<ObjectTypes> objectTypes, AssetLoadInfo assetInfos)
+        {
+            if (objectTypes.Any(objectType => objectType.Types[0] == typeof(UnityEngine.Sprite)))
+            {
+                ObjectIdentifier[] referencedObjectOld = assetInfos.referencedObjects.ToArray();
+                ObjectIdentifier[] referencedObjectsNew =
+                    GetReferencedObjects(assetInfos.includedObjects.ToArray(), _taskInput.Assets[i]);
+
+                if (referencedObjectOld.SequenceEqual(referencedObjectsNew) == false)
+                    return false;
+            }
+
+            return true;
         }
 
         private ReturnCode CalculateDependenciesNoCache(int i, AssetOutput assetResult)
@@ -142,24 +199,11 @@ namespace UnityEditor.Build.Pipeline.Tasks
             assetResult.UsageTags = new BuildUsageTagSet();
 
             assetResult.AssetInfo.asset = asset;
-            var includedObjects = ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
+            ObjectIdentifier[] includedObjects =
+                ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
             assetResult.AssetInfo.includedObjects = new List<ObjectIdentifier>(includedObjects);
-            ObjectIdentifier[] referencedObjects;
-#if NONRECURSIVE_DEPENDENCY_DATA
-            if (_taskInput.NonRecursiveDependencies)
-            {
-                referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target,
-                    _taskInput.TypeDB, DependencyType.ValidReferences);
-                referencedObjects = ExtensionMethods.FilterReferencedObjectIDs(asset, referencedObjects, _taskInput.Target,
-                    _taskInput.TypeDB, new HashSet<GUID>(_taskInput.Assets));
-            }
-            else
-#endif
-            {
-                referencedObjects =
-                    ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target,
-                        _taskInput.TypeDB);
-            }
+            
+            ObjectIdentifier[] referencedObjects = GetReferencedObjects(includedObjects, asset);
 
             assetResult.AssetInfo.referencedObjects = new List<ObjectIdentifier>(referencedObjects);
             var allObjects = new List<ObjectIdentifier>(includedObjects);
@@ -184,70 +228,26 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return ReturnCode.Success;
         }
 
-        private bool CalculateDependenciesByCache(int i, IList<CachedInfo> cachedInfo, AssetOutput assetResult)
+        private ObjectIdentifier[] GetReferencedObjects(ObjectIdentifier[] includedObjects, GUID asset)
         {
-            List<ObjectTypes> objectTypes = (List<ObjectTypes>)cachedInfo[i].Data[4];
-            AssetLoadInfo assetInfos = (AssetLoadInfo)cachedInfo[i].Data[0];
-
-            bool useCachedData = true;
-            foreach (ObjectTypes objectType in objectTypes)
-            {
-                // 自上次缓存数据以来，SpriteAtlas 和 Sprite 的关联可能发生了变化
-                // 这可能意味着我们的缓存中有过时的数据，如果是这样，请确保我们生成数据
-                if (objectType.Types[0] == typeof(UnityEngine.Sprite))
-                {
-                    ObjectIdentifier[] referencedObjectOld = assetInfos.referencedObjects.ToArray();
-                    ObjectIdentifier[] referencedObjectsNew = null;
+            ObjectIdentifier[] referencedObjects;
 #if NONRECURSIVE_DEPENDENCY_DATA
-                    if (_taskInput.NonRecursiveDependencies)
-                    {
-                        referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), _taskInput.Target, _taskInput.TypeDB, DependencyType.ValidReferences);
-                        referencedObjectsNew = ExtensionMethods.FilterReferencedObjectIDs(_taskInput.Assets[i], referencedObjectsNew, _taskInput.Target, _taskInput.TypeDB, new HashSet<GUID>(_taskInput.Assets));
-                    }
-                    else
-#endif
-                    {
-                        referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), _taskInput.Target, _taskInput.TypeDB);
-                    }
-
-                    if (referencedObjectOld.SequenceEqual(referencedObjectsNew) == false)
-                    {
-                        useCachedData = false;
-                    }
-                    break;
-                }
-            }
-            
-            if (useCachedData)
-            { 
-                assetResult.AssetInfo = assetInfos;
-                assetResult.UsageTags = cachedInfo[i].Data[1] as BuildUsageTagSet;
-                assetResult.SpriteData = cachedInfo[i].Data[2] as SpriteImporterData;
-                assetResult.ExtendedData = cachedInfo[i].Data[3] as ExtendedAssetData;
-                assetResult.ObjectTypes = objectTypes;
-                _taskOutput.AssetResults[i] = assetResult;
-                _taskOutput.CachedAssetCount++;
-                _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset} (cached)");
-                return true;
-            }
-
-            return false;
-        }
-
-        private IList<CachedInfo> GatheringCacheEntriesToLoad()
-        {
-            IList<CachedInfo> cachedInfo = null;
-            using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
+            if (_taskInput.NonRecursiveDependencies)
             {
-                if (_taskInput.BuildCache != null)
-                {
-                    IList<CacheEntry> entries = _taskInput.Assets.Select(x =>
-                        GetAssetCacheEntry(_taskInput.BuildCache, x, _taskInput.NonRecursiveDependencies)).ToList();
-                    _taskInput.BuildCache.LoadCachedData(entries, out cachedInfo);
-                }
+                referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target,
+                    _taskInput.TypeDB, DependencyType.ValidReferences);
+                referencedObjects = ExtensionMethods.FilterReferencedObjectIDs(asset, referencedObjects, _taskInput.Target,
+                    _taskInput.TypeDB, new HashSet<GUID>(_taskInput.Assets));
+            }
+            else
+#endif
+            {
+                referencedObjects =
+                    ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target,
+                        _taskInput.TypeDB);
             }
 
-            return cachedInfo;
+            return referencedObjects;
         }
 
         private void GatheringCacheEntriesToSave(IList<CachedInfo> cachedInfo)
