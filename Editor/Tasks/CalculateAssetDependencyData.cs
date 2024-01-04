@@ -56,15 +56,17 @@ namespace UnityEditor.Build.Pipeline.Tasks
         [InjectContext(ContextUsage.In)] private IBuildContent m_Content;
         [InjectContext] private IDependencyData m_DependencyData;
 
+        private TaskInput _taskInput;
+        
         public ReturnCode Run()
         {
-            TaskInput input = CreateTaskInput();
+            _taskInput = CreateTaskInput();
 
             // 场景光照信息合并
             foreach (SceneDependencyInfo sceneInfo in m_DependencyData.SceneInfo.Values)
-                input.GlobalUsage |= sceneInfo.globalUsage;
+                _taskInput.GlobalUsage |= sceneInfo.globalUsage;
 
-            ReturnCode code = RunInternal(input, out TaskOutput output);
+            ReturnCode code = RunInternal(out TaskOutput output);
             if (code == ReturnCode.Success)
                 PostSuccessRun(output);
 
@@ -93,19 +95,19 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return input;
         }
         
-        private static ReturnCode RunInternal(TaskInput input, out TaskOutput output)
+        private ReturnCode RunInternal(out TaskOutput output)
         {
             output = new TaskOutput();
-            output.AssetResults = new AssetOutput[input.Assets.Count];
+            output.AssetResults = new AssetOutput[_taskInput.Assets.Count];
 
-            IList<CachedInfo> cachedInfo = GatheringCacheEntriesToLoad(input);
+            IList<CachedInfo> cachedInfo = GatheringCacheEntriesToLoad();
 
-            for (int i = 0; i < input.Assets.Count; i++)
+            for (int i = 0; i < _taskInput.Assets.Count; i++)
             {
-                using (input.Logger.ScopedStep(LogLevel.Info, "Calculate Asset Dependencies"))
+                using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Calculate Asset Dependencies"))
                 {
                     AssetOutput assetResult = new AssetOutput();
-                    assetResult.Asset = input.Assets[i];
+                    assetResult.Asset = _taskInput.Assets[i];
                     
                     if (cachedInfo != null && cachedInfo[i] != null)
                     {
@@ -122,15 +124,15 @@ namespace UnityEditor.Build.Pipeline.Tasks
                                 ObjectIdentifier[] referencedObjectOld = assetInfos.referencedObjects.ToArray();
                                 ObjectIdentifier[] referencedObjectsNew = null;
 #if NONRECURSIVE_DEPENDENCY_DATA
-                                if (input.NonRecursiveDependencies)
+                                if (_taskInput.NonRecursiveDependencies)
                                 {
-                                    referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), input.Target, input.TypeDB, DependencyType.ValidReferences);
-                                    referencedObjectsNew = ExtensionMethods.FilterReferencedObjectIDs(input.Assets[i], referencedObjectsNew, input.Target, input.TypeDB, new HashSet<GUID>(input.Assets));
+                                    referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), _taskInput.Target, _taskInput.TypeDB, DependencyType.ValidReferences);
+                                    referencedObjectsNew = ExtensionMethods.FilterReferencedObjectIDs(_taskInput.Assets[i], referencedObjectsNew, _taskInput.Target, _taskInput.TypeDB, new HashSet<GUID>(_taskInput.Assets));
                                 }
                                 else
 #endif
                                 {
-                                    referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), input.Target, input.TypeDB);
+                                    referencedObjectsNew = ContentBuildInterface.GetPlayerDependenciesForObjects(assetInfos.includedObjects.ToArray(), _taskInput.Target, _taskInput.TypeDB);
                                 }
 
                                 if (referencedObjectOld.SequenceEqual(referencedObjectsNew) == false)
@@ -150,43 +152,43 @@ namespace UnityEditor.Build.Pipeline.Tasks
                             assetResult.ObjectTypes = objectTypes;
                             output.AssetResults[i] = assetResult;
                             output.CachedAssetCount++;
-                            input.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset} (cached)");
+                            _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset} (cached)");
                             continue;
                         }
                     }
 
-                    GUID asset = input.Assets[i];
+                    GUID asset = _taskInput.Assets[i];
                     string assetPath = AssetDatabase.GUIDToAssetPath(asset.ToString());
 
-                    if (!input.ProgressTracker.UpdateInfoUnchecked(assetPath))
+                    if (!_taskInput.ProgressTracker.UpdateInfoUnchecked(assetPath))
                         return ReturnCode.Canceled;
 
-                    input.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
+                    _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
 
                     assetResult.AssetInfo = new AssetLoadInfo();
                     assetResult.UsageTags = new BuildUsageTagSet();
 
                     assetResult.AssetInfo.asset = asset;
-                    var includedObjects = ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, input.Target);
+                    var includedObjects = ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
                     assetResult.AssetInfo.includedObjects = new List<ObjectIdentifier>(includedObjects);
                     ObjectIdentifier[] referencedObjects;
 #if NONRECURSIVE_DEPENDENCY_DATA
-                    if (input.NonRecursiveDependencies)
+                    if (_taskInput.NonRecursiveDependencies)
                     {
-                        referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, input.Target, input.TypeDB, DependencyType.ValidReferences);
-                        referencedObjects = ExtensionMethods.FilterReferencedObjectIDs(asset, referencedObjects, input.Target, input.TypeDB, new HashSet<GUID>(input.Assets));
+                        referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target, _taskInput.TypeDB, DependencyType.ValidReferences);
+                        referencedObjects = ExtensionMethods.FilterReferencedObjectIDs(asset, referencedObjects, _taskInput.Target, _taskInput.TypeDB, new HashSet<GUID>(_taskInput.Assets));
                     }
                     else
 #endif
                     {
-                        referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, input.Target, input.TypeDB);
+                        referencedObjects = ContentBuildInterface.GetPlayerDependenciesForObjects(includedObjects, _taskInput.Target, _taskInput.TypeDB);
                     }
 
                     assetResult.AssetInfo.referencedObjects = new List<ObjectIdentifier>(referencedObjects);
                     var allObjects = new List<ObjectIdentifier>(includedObjects);
                     allObjects.AddRange(referencedObjects);
                     ContentBuildInterface.CalculateBuildUsageTags(allObjects.ToArray(), includedObjects,
-                        input.GlobalUsage, assetResult.UsageTags, input.DependencyUsageCache);
+                        _taskInput.GlobalUsage, assetResult.UsageTags, _taskInput.DependencyUsageCache);
 
                     var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
                     if (importer != null && importer.textureType == TextureImporterType.Sprite)
@@ -199,50 +201,50 @@ namespace UnityEditor.Build.Pipeline.Tasks
                             assetResult.SpriteData.PackedSprite = referencedObjects.Length > 0;
                     }
                     
-                    GatherAssetRepresentations(asset, input.Target, includedObjects, out assetResult.ExtendedData);
+                    GatherAssetRepresentations(asset, _taskInput.Target, includedObjects, out assetResult.ExtendedData);
                     output.AssetResults[i] = assetResult;
                 }
             }
 
-            GatheringCacheEntriesToSave(input, output, cachedInfo);
+            GatheringCacheEntriesToSave(output, cachedInfo);
 
             return ReturnCode.Success;
         }
 
-        private static IList<CachedInfo> GatheringCacheEntriesToLoad(TaskInput input)
+        private IList<CachedInfo> GatheringCacheEntriesToLoad()
         {
             IList<CachedInfo> cachedInfo = null;
-            using (input.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
+            using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Load"))
             {
-                if (input.BuildCache != null)
+                if (_taskInput.BuildCache != null)
                 {
-                    IList<CacheEntry> entries = input.Assets.Select(x =>
-                        GetAssetCacheEntry(input.BuildCache, x, input.NonRecursiveDependencies)).ToList();
-                    input.BuildCache.LoadCachedData(entries, out cachedInfo);
+                    IList<CacheEntry> entries = _taskInput.Assets.Select(x =>
+                        GetAssetCacheEntry(_taskInput.BuildCache, x, _taskInput.NonRecursiveDependencies)).ToList();
+                    _taskInput.BuildCache.LoadCachedData(entries, out cachedInfo);
                 }
             }
 
             return cachedInfo;
         }
 
-        private static void GatheringCacheEntriesToSave(TaskInput input, TaskOutput output, IList<CachedInfo> cachedInfo)
+        private void GatheringCacheEntriesToSave(TaskOutput output, IList<CachedInfo> cachedInfo)
         {
-            using (input.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Save"))
+            using (_taskInput.Logger.ScopedStep(LogLevel.Info, "Gathering Cache Entries to Save"))
             {
-                if (input.BuildCache != null)
+                if (_taskInput.BuildCache != null)
                 {
                     List<CachedInfo> toCache = new List<CachedInfo>();
-                    for (int i = 0; i < input.Assets.Count; i++)
+                    for (int i = 0; i < _taskInput.Assets.Count; i++)
                     {
                         AssetOutput r = output.AssetResults[i];
                         if (cachedInfo[i] == null)
                         {
-                            toCache.Add(GetCachedInfo(input.BuildCache, input.Assets[i], r.AssetInfo, r.UsageTags,
-                                r.SpriteData, r.ExtendedData, input.NonRecursiveDependencies));
+                            toCache.Add(GetCachedInfo(_taskInput.BuildCache, _taskInput.Assets[i], r.AssetInfo, r.UsageTags,
+                                r.SpriteData, r.ExtendedData, _taskInput.NonRecursiveDependencies));
                         }
                     }
 
-                    input.BuildCache.SaveCachedData(toCache);
+                    _taskInput.BuildCache.SaveCachedData(toCache);
                 }
             }
         }
