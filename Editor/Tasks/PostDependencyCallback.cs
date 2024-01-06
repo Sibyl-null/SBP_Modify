@@ -4,25 +4,16 @@ using UnityEditor.Build.Pipeline.Interfaces;
 namespace UnityEditor.Build.Pipeline.Tasks
 {
     /// <summary>
-    /// Processes all callbacks after the dependency calculation task.
+    /// 处理依赖计算任务后的所有回调.
     /// </summary>
     public class PostDependencyCallback : IBuildTask
     {
-        /// <inheritdoc />
-        public int Version { get { return 1; } }
+        public int Version => 1;
 
-#pragma warning disable 649
-        [InjectContext]
-        IBuildParameters m_Parameters;
+        [InjectContext] private IBuildParameters m_Parameters;
+        [InjectContext] private IDependencyData m_DependencyData;
+        [InjectContext(ContextUsage.In)] private IDependencyCallback m_Callback;
 
-        [InjectContext]
-        IDependencyData m_DependencyData;
-
-        [InjectContext(ContextUsage.In)]
-        IDependencyCallback m_Callback;
-#pragma warning restore 649
-
-        /// <inheritdoc />
         public ReturnCode Run()
         {
             return m_Callback.PostDependency(m_Parameters, m_DependencyData);
