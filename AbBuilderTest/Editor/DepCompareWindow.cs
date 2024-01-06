@@ -56,16 +56,17 @@ namespace AbBuilderTest.Editor
                 options = ScriptCompilationOptions.None
             }, ContentPipeline.kScriptBuildPath).typeDB;
 
-            if (!ObjectIdentifier.TryGetObjectIdentifier(_asset, out ObjectIdentifier id)) 
-                return;
+            GUID guid = AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(_asset));
+            ObjectIdentifier[] assets =
+                ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(guid, BuildTarget.StandaloneWindows);
 
             ObjectIdentifier[] objectIdentifiers =
-                ContentBuildInterface.GetPlayerDependenciesForObject(id, BuildTarget.StandaloneWindows, typeDB);
+                ContentBuildInterface.GetPlayerDependenciesForObjects(assets, BuildTarget.StandaloneWindows, typeDB);
 
             _contentBuildDepMap.Clear();
             foreach (ObjectIdentifier identifier in objectIdentifiers)
             {
-                if (identifier.guid == id.guid)
+                if (identifier.guid == guid)
                     continue;
 
                 Object assetObject = ObjectIdentifier.ToObject(identifier);
@@ -73,10 +74,6 @@ namespace AbBuilderTest.Editor
                 {
                     string path = AssetDatabase.GetAssetPath(assetObject);
                     _contentBuildDepMap.TryAdd(path, assetObject);
-                }
-                else
-                {
-                    Debug.Log("ToObject Failed: " + identifier);
                 }
             }
         }
