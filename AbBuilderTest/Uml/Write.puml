@@ -1,0 +1,55 @@
+﻿@startuml
+
+interface IContextObject
+
+interface IWriteData{
+    + Dic<GUID, List<string>> AssetToFiles { get; }
+    + Dic<string, List<ObjectIdentifier>> FileToObjects { get; }
+    + List<IWriteOperation> WriteOperations { get; }
+}
+
+interface IBundleWriteData{
+    + Dic<string, string> FileToBundle { get; }
+    + Dic<string, BuildUsageTagSet> FileToUsageSet { get; }
+    + Dic<string, BuildReferenceMap> FileToReferenceMap { get; }
+}
+
+class BuildWriteData
+class BundleWriteData
+
+IContextObject <|-- IWriteData
+IWriteData <|-- IBundleWriteData
+IWriteData <|-- BuildWriteData
+IBundleWriteData <|-- BundleWriteData
+
+interface IWriteOperation{
+    + WriteCommand Command { get; set; }
+    + BuildUsageTagSet UsageSet { get; set; }
+    + BuildReferenceMap ReferenceMap { get; set; }
+    + Hash128 DependencyHash { get; set; }
+    + WriteResult Write(string, BuildSettings, BuildUsageTagGlobal)
+    + Hash128 GetHash128()
+    + Hash128 GetHash128(IBuildLogger);
+}
+
+class AssetBundleWriteOperation{
+    + AssetBundleInfo Info { get; set; }
+}
+
+class SceneBundleWriteOperation{
+    + string Scene { get; set; }
+    + PreloadInfo PreloadInfo { get; set; }
+    + SceneBundleInfo Info { get; set; }
+}
+
+class SceneDataWriteOperation{
+    + string Scene { get; set; }
+    + PreloadInfo PreloadInfo { get; set; }
+}
+
+IWriteOperation <|-- AssetBundleWriteOperation
+IWriteOperation <|-- SceneBundleWriteOperation
+IWriteOperation <|-- SceneDataWriteOperation
+IWriteData *-right- IWriteOperation
+
+@enduml

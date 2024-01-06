@@ -4,13 +4,13 @@ using UnityEditor.Build.Content;
 namespace UnityEditor.Build.Pipeline.Interfaces
 {
     /// <summary>
-    /// Base interface for the write data container.
+    /// 写数据容器的基本接口.
     /// </summary>
     public interface IWriteData : IContextObject
     {
         /// <summary>
-        /// Map of asset to file dependencies.
-        /// First dependency in the list is the main file for an asset.
+        /// 资产到文件依赖关系的映射.
+        /// 列表中的第一个依赖项是 asset 的主文件.
         /// </summary>
         Dictionary<GUID, List<string>> AssetToFiles { get; }
 
@@ -20,7 +20,7 @@ namespace UnityEditor.Build.Pipeline.Interfaces
         Dictionary<string, List<ObjectIdentifier>> FileToObjects { get; }
 
         /// <summary>
-        /// List of all write operations to serialize data to disk
+        /// 将数据序列化到磁盘的所有写操作的列表
         /// </summary>
         List<IWriteOperation> WriteOperations { get; }
     }
