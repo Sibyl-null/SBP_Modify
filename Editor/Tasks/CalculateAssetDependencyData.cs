@@ -215,6 +215,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             ContentBuildInterface.CalculateBuildUsageTags(allObjects.ToArray(), includedObjects,
                 _taskInput.GlobalUsage, assetResult.UsageTags, _taskInput.DependencyUsageCache);
 
+            // 如果是 Sprite 类型资源，则进行 Sprite Atlas 的打包设置
             TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
             if (importer != null && importer.textureType == TextureImporterType.Sprite)
             {
@@ -226,6 +227,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
                     assetResult.SpriteData.PackedSprite = referencedObjects.Length > 0;
             }
 
+            // 计算 SubAsset
             assetResult.ExtendedData = GatherAssetRepresentations(asset, _taskInput.Target, includedObjects);
             _taskOutput.AssetResults[i] = assetResult;
             
@@ -307,7 +309,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             ObjectIdentifier[] representations = ContentBuildInterface.GetPlayerAssetRepresentations(asset, target);
             
             ObjectIdentifier[] filteredRepresentations = representations.Where(includeSet.Contains).ToArray();
-            // Main Asset always returns at index 0, we only want representations, so check for greater than 1 length
+            // Main Asset 总是在索引 0 处返回, we only want representations, so check for greater than 1 length
             if (representations.IsNullOrEmpty() || filteredRepresentations.Length < 2)
                 return null;
 
