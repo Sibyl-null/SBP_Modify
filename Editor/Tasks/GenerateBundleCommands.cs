@@ -16,30 +16,14 @@ namespace UnityEditor.Build.Pipeline.Tasks
     /// </summary>
     public class GenerateBundleCommands : IBuildTask
     {
-        /// <inheritdoc />
-        public int Version { get { return 1; } }
+        public int Version => 1;
 
-#pragma warning disable 649
-        [InjectContext(ContextUsage.In)]
-        IBuildParameters m_Parameters;
-
-        [InjectContext(ContextUsage.In)]
-        IBundleBuildContent m_BuildContent;
-
-        [InjectContext(ContextUsage.In)]
-        IDependencyData m_DependencyData;
-
-        [InjectContext]
-        IBundleWriteData m_WriteData;
-
-        [InjectContext(ContextUsage.In)]
-        IDeterministicIdentifiers m_PackingMethod;
-
-#if UNITY_2019_3_OR_NEWER
-        [InjectContext(ContextUsage.In, true)]
-        ICustomAssets m_CustomAssets;
-#endif
-#pragma warning restore 649
+        [InjectContext(ContextUsage.In)] private IBuildParameters m_Parameters;
+        [InjectContext(ContextUsage.In)] private IBundleBuildContent m_BuildContent;
+        [InjectContext(ContextUsage.In)] private IDependencyData m_DependencyData;
+        [InjectContext(ContextUsage.In)] private IDeterministicIdentifiers m_PackingMethod;
+        [InjectContext(ContextUsage.In, true)] private ICustomAssets m_CustomAssets;
+        [InjectContext] private IBundleWriteData m_WriteData;
 
         static bool ValidAssetBundle(List<GUID> assets, HashSet<GUID> customAssets)
         {
@@ -47,19 +31,17 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return assets.All(x => ValidationMethods.ValidAsset(x) == ValidationMethods.Status.Asset || customAssets.Contains(x));
         }
 
-        /// <inheritdoc />
         public ReturnCode Run()
         {
             HashSet<GUID> customAssets = new HashSet<GUID>();
-#if UNITY_2019_3_OR_NEWER
             if (m_CustomAssets != null)
                 customAssets.UnionWith(m_CustomAssets.Assets);
-#endif
+            
             Dictionary<GUID, string> assetToMainFile = new Dictionary<GUID, string>();
-            foreach (var pair in m_WriteData.AssetToFiles)
+            foreach (KeyValuePair<GUID, List<string>> pair in m_WriteData.AssetToFiles)
                 assetToMainFile.Add(pair.Key, pair.Value[0]);
 
-            foreach (var bundlePair in m_BuildContent.BundleLayout)
+            foreach (KeyValuePair<string, List<GUID>> bundlePair in m_BuildContent.BundleLayout)
             {
                 if (ValidAssetBundle(bundlePair.Value, customAssets))
                 {
@@ -158,16 +140,21 @@ You can work around this issue by changing the 'FileID Generator Seed' found in 
             bundleAssets.Sort(AssetLoadInfoCompare);
 
 
-            var operation = new AssetBundleWriteOperation();
-            operation.Command = command;
-            operation.UsageSet = usageSet;
-            operation.ReferenceMap = referenceMap;
-            operation.DependencyHash = !dependencyHashes.IsNullOrEmpty() ? HashingMethods.Calculate(dependencyHashes).ToHash128() : new Hash128();
-            operation.Info = new AssetBundleInfo();
-            operation.Info.bundleName = bundleName;
-            operation.Info.bundleAssets = bundleAssets;
-
-
+            var operation = new AssetBundleWriteOperation
+            {
+                Command = command,
+                UsageSet = usageSet,
+                ReferenceMap = referenceMap,
+                DependencyHash = !dependencyHashes.IsNullOrEmpty()
+                    ? HashingMethods.Calculate(dependencyHashes).ToHash128()
+                    : new Hash128(),
+                Info = new AssetBundleInfo
+                {
+                    bundleName = bundleName,
+                    bundleAssets = bundleAssets
+                }
+            };
+            
             m_WriteData.WriteOperations.Add(operation);
             m_WriteData.FileToUsageSet.Add(command.internalName, usageSet);
             m_WriteData.FileToReferenceMap.Add(command.internalName, referenceMap);
