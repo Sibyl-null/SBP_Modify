@@ -31,7 +31,7 @@ namespace UnityEditor.Build.Pipeline.Tasks
             IList<CachedInfo> uncachedInfo = null;
             if (m_Parameters.UseCache && m_Cache != null)
             {
-                IList<CacheEntry> entries = m_Content.Scenes.Select(x => GetSceneCacheEntry(x)).ToList();
+                IList<CacheEntry> entries = m_Content.Scenes.Select(GetSceneCacheEntry).ToList();
                 m_Cache.LoadCachedData(entries, out cachedInfo);
 
                 uncachedInfo = new List<CachedInfo>();
@@ -134,7 +134,10 @@ namespace UnityEditor.Build.Pipeline.Tasks
                         if (uncachedInfo != null)
                         {
                             // 如果我们使用缓存，我们只需要收集预制依赖并计算哈希值，否则我们可以跳过它
-                            var prefabEntries = AssetDatabase.GetDependencies(AssetDatabase.GUIDToAssetPath(scene.ToString())).Where(path => path.EndsWith(".prefab")).Select(m_Cache.GetCacheEntry);
+                            IEnumerable<CacheEntry> prefabEntries = AssetDatabase
+                                .GetDependencies(AssetDatabase.GUIDToAssetPath(scene.ToString()))
+                                .Where(path => path.EndsWith(".prefab")).Select(m_Cache.GetCacheEntry);
+                            
                             prefabDependency = HashingMethods.Calculate(prefabEntries).ToHash128();
                             uncachedInfo.Add(GetCachedInfo(scene, sceneInfo.referencedObjects, sceneInfo, usageTags, prefabEntries, prefabDependency));
                         }
