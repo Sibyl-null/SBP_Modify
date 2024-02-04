@@ -139,8 +139,10 @@ namespace UnityEditor.Build.Pipeline.Tasks
                                 .Where(path => path.EndsWith(".prefab")).Select(m_Cache.GetCacheEntry);
                             
                             prefabDependency = HashingMethods.Calculate(prefabEntries).ToHash128();
-                            uncachedInfo.Add(GetCachedInfo(scene, sceneInfo.referencedObjects, sceneInfo, usageTags, prefabEntries, prefabDependency));
+                            uncachedInfo.Add(GetCachedInfo(scene, sceneInfo.referencedObjects, 
+                                sceneInfo, usageTags, prefabEntries, prefabDependency));
                         }
+                        
                         SetOutputInformation(scene, sceneInfo, usageTags, prefabDependency);
                     }
                 }
@@ -152,10 +154,10 @@ namespace UnityEditor.Build.Pipeline.Tasks
             return ReturnCode.Success;
         }
 
-        void SetOutputInformation(GUID asset, SceneDependencyInfo sceneInfo, BuildUsageTagSet usageTags, 
-            Hash128 prefabDependency)
+        void SetOutputInformation(GUID asset, SceneDependencyInfo sceneInfo, 
+            BuildUsageTagSet usageTags, Hash128 prefabDependency)
         {
-            // Add generated scene information to BuildDependencyData
+            // 将生成的场景信息添加到 BuildDependencyData
             m_DependencyData.SceneInfo.Add(asset, sceneInfo);
             m_DependencyData.SceneUsage.Add(asset, usageTags);
             m_DependencyData.DependencyHash.Add(asset, prefabDependency);
