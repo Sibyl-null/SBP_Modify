@@ -16,33 +16,20 @@ namespace UnityEditor.Build.Pipeline.Tasks
     public class CalculateCustomDependencyData : IBuildTask
     {
         public int Version => 2;
+        
+        [InjectContext(ContextUsage.Out, true)] private ICustomAssets m_CustomAssets;
+        [InjectContext(ContextUsage.In, true)] private IProgressTracker m_Tracker;
+        [InjectContext(ContextUsage.In, true)] private IBuildCache m_Cache;
+        [InjectContext(ContextUsage.In, true)] private IBuildLogger m_Log;
+        [InjectContext(ContextUsage.In)] private IBuildParameters m_Parameters;
+        [InjectContext] private IBundleBuildContent m_Content;
+        [InjectContext] private IDependencyData m_DependencyData;
 
-        [InjectContext(ContextUsage.In)]
-        IBuildParameters m_Parameters;
+        private BuildUsageTagGlobal m_GlobalUsage;
+        private BuildUsageTagGlobal m_CustomUsage;
 
-        [InjectContext]
-        IBundleBuildContent m_Content;
-
-        [InjectContext]
-        IDependencyData m_DependencyData;
-
-        [InjectContext(ContextUsage.Out, true)]
-        ICustomAssets m_CustomAssets;
-
-        [InjectContext(ContextUsage.In, true)]
-        IProgressTracker m_Tracker;
-
-        [InjectContext(ContextUsage.In, true)]
-        IBuildCache m_Cache;
-
-        [InjectContext(ContextUsage.In, true)]
-        IBuildLogger m_Log;
-
-        BuildUsageTagGlobal m_GlobalUsage;
-        BuildUsageTagGlobal m_CustomUsage;
-
-        Dictionary<string, AssetLoadInfo> m_AssetInfo = new Dictionary<string, AssetLoadInfo>();
-        Dictionary<string, BuildUsageTagSet> m_BuildUsage = new Dictionary<string, BuildUsageTagSet>();
+        private Dictionary<string, AssetLoadInfo> m_AssetInfo = new Dictionary<string, AssetLoadInfo>();
+        private Dictionary<string, BuildUsageTagSet> m_BuildUsage = new Dictionary<string, BuildUsageTagSet>();
 
         public ReturnCode Run()
         {

@@ -31,12 +31,14 @@ namespace UnityEditor.Build.Pipeline.Tasks
             unusedSources.UnionWith(textures);
 
             // Count refs from assets
-            var assetRefs = m_DependencyData.AssetInfo.SelectMany(x => x.Value.referencedObjects);
+            var assetRefs = m_DependencyData.AssetInfo
+                .SelectMany(x => x.Value.referencedObjects);
             foreach (ObjectIdentifier reference in assetRefs)
                 unusedSources.Remove(reference);
 
             // Count refs from scenes
-            var sceneRefs = m_DependencyData.SceneInfo.SelectMany(x => x.Value.referencedObjects);
+            var sceneRefs = m_DependencyData.SceneInfo
+                .SelectMany(x => x.Value.referencedObjects);
             foreach (ObjectIdentifier reference in sceneRefs)
                 unusedSources.Remove(reference);
 

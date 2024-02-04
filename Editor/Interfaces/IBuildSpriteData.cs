@@ -11,24 +11,18 @@ namespace UnityEditor.Build.Pipeline.Interfaces
     public class SpriteImporterData
     {
         /// <summary>
-        /// Property if this sprite asset is packed by the sprite packer.
+        /// 该资源是否由 sprite packer 打包
         /// </summary>
         public bool PackedSprite { get; set; }
 
         /// <summary>
-        /// Object identifier of the source texture for the sprite.
+        /// 该 Sprite 的原始纹理资源
         /// </summary>
         public ObjectIdentifier SourceTexture { get; set; }
     }
-
-    /// <summary>
-    /// Base interface for the storing sprite importer data for sprite assets.
-    /// </summary>
+    
     public interface IBuildSpriteData : IContextObject
     {
-        /// <summary>
-        /// Map of sprite asset to importer data.
-        /// </summary>
         Dictionary<GUID, SpriteImporterData> ImporterData { get; }
     }
 }

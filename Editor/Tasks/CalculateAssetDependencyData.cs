@@ -203,10 +203,12 @@ namespace UnityEditor.Build.Pipeline.Tasks
 
             _taskInput.Logger.AddEntrySafe(LogLevel.Info, $"{assetResult.Asset}");
 
+            // 获取 asset 包含的所有资源对象
             ObjectIdentifier[] includedObjects =
                 ContentBuildInterface.GetPlayerObjectIdentifiersInAsset(asset, _taskInput.Target);
             assetResult.AssetInfo.includedObjects = new List<ObjectIdentifier>(includedObjects);
             
+            // 获取引用
             ObjectIdentifier[] referencedObjects = GetReferencedObjects(includedObjects, asset);
             assetResult.AssetInfo.referencedObjects = new List<ObjectIdentifier>(referencedObjects);
             
